@@ -18,7 +18,7 @@ if (!AGENT_BASE_URL || !AGENT_SHARED_TOKEN) {
 }
 
 app.register(fastifyStatic, {
-  root: path.join(__dirname, "..", "public")
+  root: path.join(__dirname, "public")
 });
 
 app.get("/health", async () => ({
@@ -46,7 +46,7 @@ app.all("/api/*", async (request, reply) => {
 });
 
 app.setNotFoundHandler(async (_request, reply) => {
-  const html = await fs.readFile(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  const html = await fs.readFile(path.join(__dirname, "public", "index.html"), "utf8");
   reply.type("text/html").send(html);
 });
 
