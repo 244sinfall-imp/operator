@@ -16,11 +16,30 @@ const rootSelect = document.getElementById("root-select");
 const pathInput = document.getElementById("path-input");
 const entriesEl = document.getElementById("entries");
 const editorEl = document.getElementById("editor");
+const editorHighlightEl = document.getElementById("editor-highlight");
 const statusPill = document.getElementById("status-pill");
 const activeFileLabel = document.getElementById("active-file-label");
+const languageBadge = document.getElementById("language-badge");
 const diffOutput = document.getElementById("diff-output");
 const searchResults = document.getElementById("search-results");
 const logoutButton = document.getElementById("logout-button");
+const entriesCount = document.getElementById("entries-count");
+const searchCount = document.getElementById("search-count");
+
+const LANGUAGE_BY_EXTENSION = new Map([
+  ["css", "css"],
+  ["html", "html"],
+  ["js", "javascript"],
+  ["json", "json"],
+  ["jsx", "javascript"],
+  ["md", "markdown"],
+  ["mjs", "javascript"],
+  ["sh", "shell"],
+  ["ts", "typescript"],
+  ["tsx", "typescript"],
+  ["yaml", "yaml"],
+  ["yml", "yaml"]
+]);
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -57,8 +76,172 @@ function clearAuthError() {
   authError.classList.add("hidden");
 }
 
-function setStatus(message) {
+function setStatus(message, tone = "ok") {
   statusPill.textContent = message;
+  statusPill.classList.toggle("busy", tone === "busy");
+  statusPill.classList.toggle("error", tone === "error");
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function detectLanguage(path) {
+  const filename = path.split("/").pop() || "";
+  const extension = filename.includes(".") ? filename.split(".").pop().toLowerCase() : "";
+  return LANGUAGE_BY_EXTENSION.get(extension) || "plain text";
+}
+
+function formatBytes(size) {
+  if (!Number.isFinite(size)) {
+    return "unknown";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let value = size;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function formatMtime(ms) {
+  if (!Number.isFinite(ms)) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(ms));
+}
+
+function updateDirtyState() {
+  appShell.classList.toggle(
+    "is-dirty",
+    Boolean(state.currentFilePath && editorEl.value !== state.originalContent)
+  );
+}
+
+function highlightByPattern(value, pattern, classify) {
+  let html = "";
+  let lastIndex = 0;
+
+  value.replace(pattern, (match, ...args) => {
+    const offset = args[args.length - 2];
+    html += escapeHtml(value.slice(lastIndex, offset));
+    html += `<span class="tok ${classify(match)}">${escapeHtml(match)}</span>`;
+    lastIndex = offset + match.length;
+    return match;
+  });
+
+  return html + escapeHtml(value.slice(lastIndex));
+}
+
+function highlightCode(value, language) {
+  if (!value) {
+    return "";
+  }
+
+  if (language === "json") {
+    return highlightByPattern(
+      value,
+      /("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"\s*:|"(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b|\btrue\b|\bfalse\b|\bnull\b)/g,
+      (token) => {
+        if (token.startsWith("\"") && token.trim().endsWith(":")) return "key";
+        if (token.startsWith("\"")) return "string";
+        if (/true|false/.test(token)) return "boolean";
+        if (token === "null") return "null";
+        return "number";
+      }
+    );
+  }
+
+  if (["javascript", "typescript"].includes(language)) {
+    return highlightByPattern(
+      value,
+      /(\/\/.*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|\b(?:async|await|break|case|catch|class|const|continue|default|else|export|for|from|function|if|import|let|new|return|throw|try|type|var|while)\b|\b\d+(?:\.\d+)?\b)/g,
+      (token) => {
+        if (token.startsWith("//") || token.startsWith("/*")) return "comment";
+        if (token.startsWith("\"") || token.startsWith("'") || token.startsWith("`")) return "string";
+        if (/^\d/.test(token)) return "number";
+        return "keyword";
+      }
+    );
+  }
+
+  if (language === "shell") {
+    return highlightByPattern(
+      value,
+      /(#.*|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|\b(?:case|do|done|elif|else|esac|fi|for|function|if|in|then|while)\b|\b\d+(?:\.\d+)?\b)/g,
+      (token) => {
+        if (token.startsWith("#")) return "comment";
+        if (token.startsWith("\"") || token.startsWith("'")) return "string";
+        if (/^\d/.test(token)) return "number";
+        return "keyword";
+      }
+    );
+  }
+
+  if (language === "css") {
+    return highlightByPattern(
+      value,
+      /(\/\*[\s\S]*?\*\/|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[\w-]+(?=\s*:)|#[\da-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|vh|vw|%)?\b)/g,
+      (token) => {
+        if (token.startsWith("/*")) return "comment";
+        if (token.startsWith("\"") || token.startsWith("'")) return "string";
+        if (token.startsWith("#")) return "number";
+        if (/^\d/.test(token)) return "number";
+        return "key";
+      }
+    );
+  }
+
+  if (language === "yaml") {
+    return highlightByPattern(
+      value,
+      /(#.*|"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[\w-]+(?=\s*:)|\b\d+(?:\.\d+)?\b|\btrue\b|\bfalse\b|\bnull\b)/g,
+      (token) => {
+        if (token.startsWith("#")) return "comment";
+        if (token.startsWith("\"") || token.startsWith("'")) return "string";
+        if (/^\d/.test(token)) return "number";
+        if (/true|false/.test(token)) return "boolean";
+        if (token === "null") return "null";
+        return "key";
+      }
+    );
+  }
+
+  if (language === "html" || language === "markdown") {
+    return highlightByPattern(
+      value,
+      /(<!--[\s\S]*?-->|<\/?[\w-]+(?:\s+[^>]*)?>|`[^`]+`|\*\*[^*]+\*\*|^#{1,6}\s.+$)/gm,
+      (token) => {
+        if (token.startsWith("<!--")) return "comment";
+        if (token.startsWith("<")) return "keyword";
+        if (token.startsWith("#")) return "key";
+        return "string";
+      }
+    );
+  }
+
+  return escapeHtml(value);
+}
+
+function updateEditorHighlight() {
+  const language = detectLanguage(state.currentFilePath);
+  editorHighlightEl.innerHTML = highlightCode(editorEl.value, language);
+  languageBadge.textContent = language;
+  updateDirtyState();
 }
 
 async function ensureSession() {
@@ -121,13 +304,35 @@ async function openDirectory(targetPath) {
   pathInput.value = data.path;
   entriesEl.innerHTML = "";
   data.items.forEach((item) => {
-    const node = document.createElement("div");
-    node.className = "entry";
-    node.innerHTML = `<strong>${item.kind === "directory" ? "DIR" : "FILE"} ${item.name}</strong><small>${item.path}</small>`;
+    const node = document.createElement("button");
+    node.className = `entry ${item.kind}`;
+    node.type = "button";
     node.onclick = () => item.kind === "directory" ? openDirectory(item.path) : openFile(item.path);
+
+    const icon = document.createElement("span");
+    icon.className = "entry-icon";
+    icon.setAttribute("aria-hidden", "true");
+
+    const text = document.createElement("span");
+    text.className = "entry-text";
+
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+
+    const path = document.createElement("small");
+    path.textContent = item.path;
+
+    const meta = document.createElement("small");
+    meta.textContent = item.kind === "directory"
+      ? `folder / ${formatMtime(item.mtimeMs)}`
+      : `${formatBytes(item.size)} / ${formatMtime(item.mtimeMs)}`;
+
+    text.append(name, path, meta);
+    node.append(icon, text);
     entriesEl.appendChild(node);
   });
-  setStatus(`Opened ${data.path}`);
+  entriesCount.textContent = String(data.items.length);
+  setStatus(`${data.items.length} entries`);
 }
 
 async function openFile(targetPath, lineNumber) {
@@ -137,14 +342,17 @@ async function openFile(targetPath, lineNumber) {
   state.originalContent = data.content;
   editorEl.value = data.content;
   activeFileLabel.textContent = lineNumber ? `${data.path}:${lineNumber}` : data.path;
+  updateEditorHighlight();
   if (lineNumber) {
     const lines = data.content.split("\n");
     const offset = lines.slice(0, Math.max(lineNumber - 1, 0)).join("\n").length;
     editorEl.focus();
     editorEl.setSelectionRange(offset, offset);
+    editorHighlightEl.scrollTop = editorEl.scrollTop;
+    editorHighlightEl.scrollLeft = editorEl.scrollLeft;
   }
   diffOutput.classList.add("hidden");
-  setStatus(`Loaded ${data.path}`);
+  setStatus(`${formatBytes(data.size)} loaded`);
 }
 
 async function saveFile() {
@@ -163,6 +371,7 @@ async function saveFile() {
 
   state.currentSha256 = data.sha256;
   state.originalContent = editorEl.value;
+  updateDirtyState();
   setStatus("Saved");
 }
 
@@ -189,24 +398,47 @@ async function search() {
     return;
   }
 
-  const data = await api("/api/v1/search", {
-    method: "POST",
-    body: JSON.stringify({
-      query,
-      root: state.root
-    })
-  });
+  setStatus("Searching...", "busy");
 
   searchResults.innerHTML = "";
-  data.results.forEach((result) => {
-    const node = document.createElement("div");
-    node.className = "search-result";
-    node.innerHTML = `<strong>${result.path}:${result.line}</strong><small>${result.preview}</small>`;
-    node.onclick = () => openFile(result.path, result.line);
-    searchResults.appendChild(node);
-  });
+  searchCount.textContent = "0";
+  try {
+    const data = await api("/api/v1/search", {
+      method: "POST",
+      body: JSON.stringify({
+        query,
+        root: state.root
+      })
+    });
 
-  setStatus(`Search: ${data.results.length} hits`);
+    data.results.forEach((result) => {
+      const node = document.createElement("button");
+      node.className = "search-result";
+      node.type = "button";
+      node.onclick = () => openFile(result.path, result.line);
+
+      const title = document.createElement("strong");
+      title.textContent = `${result.path}:${result.line}`;
+
+      const preview = document.createElement("small");
+      preview.textContent = result.preview;
+
+      node.append(title, preview);
+      searchResults.appendChild(node);
+    });
+
+    searchCount.textContent = String(data.results.length);
+    if (data.results.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No matches";
+      searchResults.appendChild(empty);
+    }
+
+    setStatus(`Search: ${data.results.length} hits`);
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
 }
 
 document.getElementById("open-path").onclick = () => openDirectory(pathInput.value);
@@ -224,7 +456,17 @@ document.getElementById("go-up").onclick = () => {
 document.getElementById("save-file").onclick = saveFile;
 document.getElementById("show-diff").onclick = showDiff;
 document.getElementById("search-button").onclick = search;
+document.getElementById("search-input").onkeydown = (event) => {
+  if (event.key === "Enter") {
+    search();
+  }
+};
 logoutButton.onclick = logout;
+editorEl.oninput = updateEditorHighlight;
+editorEl.onscroll = () => {
+  editorHighlightEl.scrollTop = editorEl.scrollTop;
+  editorHighlightEl.scrollLeft = editorEl.scrollLeft;
+};
 rootSelect.onchange = () => {
   state.root = rootSelect.value;
   openDirectory(state.root);
@@ -248,5 +490,5 @@ ensureSession().then((authenticated) => {
 
   return loadRoots();
 }).catch((error) => {
-  setStatus(error.message);
+  setStatus(error.message, "error");
 });

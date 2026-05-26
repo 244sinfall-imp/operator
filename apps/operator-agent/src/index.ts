@@ -1,13 +1,11 @@
 import crypto from "node:crypto";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import Fastify from "fastify";
 import { createTwoFilesPatch } from "diff";
 
-const execFileAsync = promisify(execFile);
 const app = Fastify({ logger: true });
 
 const OPERATOR_TOKEN = process.env.OPERATOR_TOKEN;
@@ -18,6 +16,8 @@ if (!OPERATOR_TOKEN) {
 const BIND_HOST = process.env.OPERATOR_BIND_HOST ?? "0.0.0.0";
 const PORT = Number(process.env.OPERATOR_PORT ?? "31900");
 const MAX_FILE_BYTES = Number(process.env.OPERATOR_MAX_FILE_BYTES ?? String(1024 * 1024));
+const SEARCH_RESULT_LIMIT = Number(process.env.OPERATOR_SEARCH_RESULT_LIMIT ?? "200");
+const SEARCH_MAX_COLUMNS = Number(process.env.OPERATOR_SEARCH_MAX_COLUMNS ?? "240");
 const TRASH_ROOT = expandHome(process.env.OPERATOR_TRASH_DIR ?? "~/.openclaw/trash/bes-operator");
 const ALLOWED_ROOTS = parseAllowedRoots(process.env.OPERATOR_ALLOWED_ROOTS);
 
@@ -31,6 +31,11 @@ type ListItem = {
 };
 
 type HttpError = Error & { statusCode: number };
+type SearchResult = {
+  path: string;
+  line: number;
+  preview: string;
+};
 
 function expandHome(value: string): string {
   if (value === "~") {
@@ -172,6 +177,91 @@ function makeHttpError(statusCode: number, message: string): HttpError {
   return error;
 }
 
+function parseSearchResult(line: string): SearchResult | null {
+  const firstColon = line.indexOf(":");
+  const secondColon = line.indexOf(":", firstColon + 1);
+  if (firstColon === -1 || secondColon === -1) {
+    return null;
+  }
+
+  return {
+    path: line.slice(0, firstColon),
+    line: Number(line.slice(firstColon + 1, secondColon)),
+    preview: line.slice(secondColon + 1)
+  };
+}
+
+async function searchFiles(query: string, root: string): Promise<SearchResult[]> {
+  return new Promise((resolve, reject) => {
+    const results: SearchResult[] = [];
+    const child = spawn("rg", [
+      "--line-number",
+      "--hidden",
+      "--color",
+      "never",
+      "--max-columns",
+      String(SEARCH_MAX_COLUMNS),
+      "--max-columns-preview",
+      "--glob",
+      "!.git",
+      "--smart-case",
+      query,
+      root
+    ]);
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    let stoppedAtLimit = false;
+
+    function appendResults(chunk: string): void {
+      stdoutBuffer += chunk;
+      let newlineIndex = stdoutBuffer.indexOf("\n");
+
+      while (newlineIndex !== -1) {
+        const line = stdoutBuffer.slice(0, newlineIndex);
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        const result = parseSearchResult(line);
+        if (result) {
+          results.push(result);
+        }
+
+        if (results.length >= SEARCH_RESULT_LIMIT) {
+          stoppedAtLimit = true;
+          child.kill();
+          return;
+        }
+
+        newlineIndex = stdoutBuffer.indexOf("\n");
+      }
+    }
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+
+    child.stdout.on("data", appendResults);
+    child.stderr.on("data", (chunk: string) => {
+      stderrBuffer = (stderrBuffer + chunk).slice(-4096);
+    });
+    child.on("error", (error) => {
+      reject(makeHttpError(500, error.message));
+    });
+    child.on("close", (code) => {
+      if (!stoppedAtLimit && stdoutBuffer) {
+        const result = parseSearchResult(stdoutBuffer);
+        if (result) {
+          results.push(result);
+        }
+      }
+
+      if (stoppedAtLimit || code === 0 || code === 1) {
+        resolve(results.slice(0, SEARCH_RESULT_LIMIT));
+        return;
+      }
+
+      reject(makeHttpError(500, stderrBuffer.trim() || `Search failed with exit code ${code}`));
+    });
+  });
+}
+
 app.addHook("onRequest", async (request) => {
   const token = request.headers["x-operator-token"];
   if (token !== OPERATOR_TOKEN) {
@@ -262,31 +352,9 @@ app.post<{ Body: { query: string; root?: string } }>("/api/v1/search", async (re
   if (!root) {
     throw makeHttpError(500, "No allowed roots configured");
   }
-  const { stdout } = await execFileAsync("rg", [
-    "--line-number",
-    "--hidden",
-    "--max-count",
-    "200",
-    "--glob",
-    "!.git",
-    "--smart-case",
-    request.body.query,
-    root
-  ]);
 
   return {
-    results: stdout
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        const firstColon = line.indexOf(":");
-        const secondColon = line.indexOf(":", firstColon + 1);
-        return {
-          path: line.slice(0, firstColon),
-          line: Number(line.slice(firstColon + 1, secondColon)),
-          preview: line.slice(secondColon + 1)
-        };
-      })
+    results: await searchFiles(request.body.query, root)
   };
 });
 

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp -R public dist/public",
+    "build": "tsc -p tsconfig.json && rm -rf dist/public && cp -R public dist/public",
     "check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -13,4 +13,3 @@
     "fastify": "^5.6.1"
   }
 }
-

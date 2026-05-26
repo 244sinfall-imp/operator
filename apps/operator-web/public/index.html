@@ -3,69 +3,130 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bes Operator</title>
+    <title>Imp Operator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
     <div class="auth-shell" id="auth-shell">
       <form class="auth-card" id="login-form">
-        <div class="eyebrow">Bes Operator</div>
-        <h1>Unlock cockpit</h1>
+        <div class="brand-lockup auth-brand">
+          <span class="imp-logo imp-logo-large" aria-hidden="true"><span class="imp-eyes"></span></span>
+          <div>
+            <div class="eyebrow">Imp Operator</div>
+            <h1>Unlock cockpit</h1>
+          </div>
+        </div>
         <p class="auth-copy">Enter the operator password for this host.</p>
-        <label class="auth-label" for="password-input">Password</label>
-        <input id="password-input" name="password" type="password" autocomplete="current-password" required />
-        <button type="submit">Enter</button>
+        <label class="control-field auth-field" for="password-input">
+          <span>Password</span>
+          <input id="password-input" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-button" type="submit">
+          <span class="button-icon" aria-hidden="true">&rarr;</span>
+          <span>Enter</span>
+        </button>
         <div class="auth-error hidden" id="auth-error"></div>
       </form>
     </div>
 
     <div class="shell hidden" id="app-shell">
       <header class="topbar">
-        <div>
-          <div class="eyebrow">Bes Operator</div>
-          <h1>Filesystem cockpit</h1>
+        <div class="brand-lockup">
+          <span class="imp-logo" aria-hidden="true"><span class="imp-eyes"></span></span>
+          <div>
+            <div class="eyebrow">Imp Operator</div>
+            <h1>Host Files</h1>
+          </div>
         </div>
         <div class="topbar-actions">
           <div class="status" id="status-pill">loading</div>
-          <button id="logout-button" class="ghost-button" type="button">Logout</button>
+          <button id="logout-button" class="ghost-button" type="button">
+            <span class="button-icon" aria-hidden="true">Esc</span>
+            <span>Logout</span>
+          </button>
         </div>
       </header>
 
       <section class="toolbar">
-        <select id="root-select"></select>
-        <input id="path-input" type="text" placeholder="Path" />
-        <button id="open-path">Open</button>
-        <button id="go-up">Up</button>
-        <button id="refresh">Refresh</button>
+        <label class="control-field root-field" for="root-select">
+          <span>Root</span>
+          <select id="root-select"></select>
+        </label>
+        <label class="control-field path-field" for="path-input">
+          <span>Path</span>
+          <input id="path-input" type="text" placeholder="/home/imp/workspace" />
+        </label>
+        <div class="toolbar-actions">
+          <button id="open-path" class="tool-button" type="button">
+            <span class="button-icon" aria-hidden="true">&#9166;</span>
+            <span>Open</span>
+          </button>
+          <button id="go-up" class="tool-button" type="button">
+            <span class="button-icon" aria-hidden="true">&uarr;</span>
+            <span>Up</span>
+          </button>
+          <button id="refresh" class="tool-button" type="button">
+            <span class="button-icon" aria-hidden="true">&#8635;</span>
+            <span>Refresh</span>
+          </button>
+        </div>
       </section>
 
       <section class="searchbar">
-        <input id="search-input" type="search" placeholder="Search with rg" />
-        <button id="search-button">Search</button>
+        <label class="control-field search-field" for="search-input">
+          <span>Search</span>
+          <input id="search-input" type="search" placeholder="rg pattern" />
+        </label>
+        <button id="search-button" class="tool-button" type="button">
+          <span class="button-icon" aria-hidden="true">&#8981;</span>
+          <span>Search</span>
+        </button>
       </section>
 
       <main class="layout">
-        <aside class="panel">
-          <div class="panel-title">Entries</div>
+        <aside class="panel explorer-panel">
+          <div class="panel-title">
+            <span>Entries</span>
+            <span class="panel-count" id="entries-count">0</span>
+          </div>
           <div class="panel-body" id="entries"></div>
         </aside>
 
         <section class="panel editor-panel">
           <div class="panel-title split">
-            <span id="active-file-label">No file selected</span>
+            <span class="active-file" id="active-file-label">No file selected</span>
             <div class="actions">
-              <button id="show-diff">Diff</button>
-              <button id="save-file">Save</button>
+              <span class="language-badge" id="language-badge">plain text</span>
+              <button id="show-diff" class="tool-button" type="button">
+                <span class="button-icon" aria-hidden="true">&plusmn;</span>
+                <span>Diff</span>
+              </button>
+              <button id="save-file" class="primary-button" type="button">
+                <span class="button-icon" aria-hidden="true">&#9670;</span>
+                <span>Save</span>
+              </button>
             </div>
           </div>
           <div class="panel-body editor-stack">
-            <textarea id="editor" spellcheck="false" placeholder="Open a text file to edit"></textarea>
+            <div class="editor-shell">
+              <pre class="editor-highlight" id="editor-highlight" aria-hidden="true"></pre>
+              <textarea id="editor" class="editor-input" spellcheck="false" placeholder="Open a text file to edit"></textarea>
+            </div>
             <pre id="diff-output" class="diff-output hidden"></pre>
           </div>
         </section>
 
-        <aside class="panel">
-          <div class="panel-title">Search results</div>
+        <aside class="panel search-panel">
+          <div class="panel-title">
+            <span>Search Results</span>
+            <span class="panel-count" id="search-count">0</span>
+          </div>
           <div class="panel-body" id="search-results"></div>
         </aside>
       </main>
