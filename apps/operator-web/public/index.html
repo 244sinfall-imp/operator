@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bes Operator</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Bes Operator</div>
+          <h1>Filesystem cockpit</h1>
+        </div>
+        <div class="status" id="status-pill">loading</div>
+      </header>
+
+      <section class="toolbar">
+        <select id="root-select"></select>
+        <input id="path-input" type="text" placeholder="Path" />
+        <button id="open-path">Open</button>
+        <button id="go-up">Up</button>
+        <button id="refresh">Refresh</button>
+      </section>
+
+      <section class="searchbar">
+        <input id="search-input" type="search" placeholder="Search with rg" />
+        <button id="search-button">Search</button>
+      </section>
+
+      <main class="layout">
+        <aside class="panel">
+          <div class="panel-title">Entries</div>
+          <div class="panel-body" id="entries"></div>
+        </aside>
+
+        <section class="panel editor-panel">
+          <div class="panel-title split">
+            <span id="active-file-label">No file selected</span>
+            <div class="actions">
+              <button id="show-diff">Diff</button>
+              <button id="save-file">Save</button>
+            </div>
+          </div>
+          <div class="panel-body editor-stack">
+            <textarea id="editor" spellcheck="false" placeholder="Open a text file to edit"></textarea>
+            <pre id="diff-output" class="diff-output hidden"></pre>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="panel-title">Search results</div>
+          <div class="panel-body" id="search-results"></div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+  </html>
+

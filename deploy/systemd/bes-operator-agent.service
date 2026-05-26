@@ -1,0 +1,15 @@
+[Unit]
+Description=Bes Operator Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openclaw/workspaces/self-maintainer/repos/operator/apps/operator-agent
+EnvironmentFile=%h/.openclaw/bes-operator/agent.env
+ExecStart=/home/imp/.nvm/versions/node/v24.15.0/bin/node dist/index.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

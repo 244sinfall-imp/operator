@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bes-operator-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bes-operator-web
+  template:
+    metadata:
+      labels:
+        app: bes-operator-web
+    spec:
+      containers:
+        - name: web
+          image: registry.244sinfall.ru/bes-operator-web:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: AGENT_BASE_URL
+              value: http://65.108.196.200:31900
+            - name: AGENT_SHARED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bes-operator-web
+                  key: AGENT_SHARED_TOKEN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bes-operator-web
+spec:
+  selector:
+    app: bes-operator-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
