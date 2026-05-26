@@ -205,6 +205,7 @@ async function searchFiles(query: string, root: string): Promise<SearchResult[]>
       "--glob",
       "!.git",
       "--smart-case",
+      "--",
       query,
       root
     ]);
