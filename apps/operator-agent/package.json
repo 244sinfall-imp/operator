@@ -1,6 +1,6 @@
 {
   "name": "@bes/operator-agent",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -13,4 +13,3 @@
     "fastify": "^5.6.1"
   }
 }
-
