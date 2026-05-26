@@ -7,13 +7,28 @@
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
-    <div class="shell">
+    <div class="auth-shell" id="auth-shell">
+      <form class="auth-card" id="login-form">
+        <div class="eyebrow">Bes Operator</div>
+        <h1>Unlock cockpit</h1>
+        <p class="auth-copy">Enter the operator password for this host.</p>
+        <label class="auth-label" for="password-input">Password</label>
+        <input id="password-input" name="password" type="password" autocomplete="current-password" required />
+        <button type="submit">Enter</button>
+        <div class="auth-error hidden" id="auth-error"></div>
+      </form>
+    </div>
+
+    <div class="shell hidden" id="app-shell">
       <header class="topbar">
         <div>
           <div class="eyebrow">Bes Operator</div>
           <h1>Filesystem cockpit</h1>
         </div>
-        <div class="status" id="status-pill">loading</div>
+        <div class="topbar-actions">
+          <div class="status" id="status-pill">loading</div>
+          <button id="logout-button" class="ghost-button" type="button">Logout</button>
+        </div>
       </header>
 
       <section class="toolbar">
@@ -59,4 +74,3 @@
     <script src="/app.js" defer></script>
   </body>
   </html>
-

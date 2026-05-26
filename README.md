@@ -12,6 +12,7 @@ The first release focuses on a mobile-friendly filesystem UI:
 - edit files with diff preview
 - search with `rg`
 - move deleted files into trash instead of removing them
+- app-level password login with signed session cookie
 
 ## Architecture
 
@@ -53,6 +54,8 @@ Important variables:
 - `AGENT_BASE_URL`
 - `AGENT_SHARED_TOKEN`
 - `PORT`
+- `OPERATOR_UI_PASSWORD_HASH` (`scrypt$salt$hexhash`)
+- `OPERATOR_SESSION_SECRET`
 
 ## Safety model
 
@@ -61,4 +64,3 @@ Important variables:
 - writes require the caller to send the last seen file hash
 - delete flows move files into trash
 - large or binary files are not opened in the editor
-

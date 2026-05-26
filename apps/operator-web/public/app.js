@@ -1,4 +1,5 @@
 const state = {
+  authenticated: false,
   root: "",
   currentPath: "",
   currentFilePath: "",
@@ -6,6 +7,11 @@ const state = {
   originalContent: ""
 };
 
+const authShell = document.getElementById("auth-shell");
+const appShell = document.getElementById("app-shell");
+const loginForm = document.getElementById("login-form");
+const passwordInput = document.getElementById("password-input");
+const authError = document.getElementById("auth-error");
 const rootSelect = document.getElementById("root-select");
 const pathInput = document.getElementById("path-input");
 const entriesEl = document.getElementById("entries");
@@ -14,24 +20,84 @@ const statusPill = document.getElementById("status-pill");
 const activeFileLabel = document.getElementById("active-file-label");
 const diffOutput = document.getElementById("diff-output");
 const searchResults = document.getElementById("search-results");
+const logoutButton = document.getElementById("logout-button");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "content-type": "application/json" },
+    credentials: "same-origin",
     ...options
   });
 
   const text = await response.text();
   const payload = text ? JSON.parse(text) : {};
   if (!response.ok) {
+    if (response.status === 401) {
+      setAuthenticated(false);
+    }
     throw new Error(payload.message || `Request failed: ${response.status}`);
   }
 
   return payload;
 }
 
+function setAuthenticated(value) {
+  state.authenticated = value;
+  authShell.classList.toggle("hidden", value);
+  appShell.classList.toggle("hidden", !value);
+}
+
+function showAuthError(message) {
+  authError.textContent = message;
+  authError.classList.remove("hidden");
+}
+
+function clearAuthError() {
+  authError.textContent = "";
+  authError.classList.add("hidden");
+}
+
 function setStatus(message) {
   statusPill.textContent = message;
+}
+
+async function ensureSession() {
+  const response = await fetch("/auth/session", { credentials: "same-origin" });
+  if (!response.ok) {
+    setAuthenticated(false);
+    passwordInput.focus();
+    return false;
+  }
+
+  setAuthenticated(true);
+  return true;
+}
+
+async function login(password) {
+  const response = await fetch("/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ password })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message || "Invalid password");
+  }
+
+  clearAuthError();
+  setAuthenticated(true);
+}
+
+async function logout() {
+  await fetch("/auth/logout", {
+    method: "POST",
+    credentials: "same-origin"
+  });
+  setAuthenticated(false);
+  passwordInput.value = "";
+  passwordInput.focus();
 }
 
 async function loadRoots() {
@@ -158,12 +224,29 @@ document.getElementById("go-up").onclick = () => {
 document.getElementById("save-file").onclick = saveFile;
 document.getElementById("show-diff").onclick = showDiff;
 document.getElementById("search-button").onclick = search;
+logoutButton.onclick = logout;
 rootSelect.onchange = () => {
   state.root = rootSelect.value;
   openDirectory(state.root);
 };
 
-loadRoots().catch((error) => {
+loginForm.onsubmit = async (event) => {
+  event.preventDefault();
+  clearAuthError();
+  try {
+    await login(passwordInput.value);
+    await loadRoots();
+  } catch (error) {
+    showAuthError(error.message);
+  }
+};
+
+ensureSession().then((authenticated) => {
+  if (!authenticated) {
+    return;
+  }
+
+  return loadRoots();
+}).catch((error) => {
   setStatus(error.message);
 });
-

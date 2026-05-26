@@ -22,6 +22,42 @@ body {
   color: var(--ink);
 }
 
+.hidden {
+  display: none !important;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.auth-card {
+  width: min(100%, 26rem);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.auth-copy,
+.auth-label,
+.auth-error {
+  color: var(--muted);
+}
+
+.auth-label {
+  font-weight: 600;
+}
+
+.auth-error {
+  color: #a73422;
+}
+
 .shell {
   min-height: 100vh;
   padding: 1rem;
@@ -59,6 +95,12 @@ h1 {
   margin: 0.25rem 0 0;
   font-family: "Iowan Old Style", "Palatino Linotype", serif;
   font-size: 1.8rem;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .status {
@@ -108,6 +150,12 @@ button {
   background: var(--accent-2);
   color: white;
   padding: 0.75rem 1rem;
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--accent-2);
+  border: 1px solid var(--line);
 }
 
 .layout {
@@ -181,10 +229,6 @@ textarea {
   padding: 1rem;
 }
 
-.hidden {
-  display: none;
-}
-
 .actions {
   display: flex;
   gap: 0.5rem;
@@ -199,4 +243,3 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
-

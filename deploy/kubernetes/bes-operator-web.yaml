@@ -25,6 +25,16 @@ spec:
                 secretKeyRef:
                   name: bes-operator-web
                   key: AGENT_SHARED_TOKEN
+            - name: OPERATOR_UI_PASSWORD_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: bes-operator-web
+                  key: OPERATOR_UI_PASSWORD_HASH
+            - name: OPERATOR_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bes-operator-web
+                  key: OPERATOR_SESSION_SECRET
 ---
 apiVersion: v1
 kind: Service
