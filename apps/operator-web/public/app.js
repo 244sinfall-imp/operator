@@ -450,11 +450,11 @@ async function restartGateway() {
   restartGatewayButton.disabled = true;
   setStatus("Restarting gateway...", "busy");
   try {
-    await api("/api/v1/openclaw/gateway/restart", {
+    const data = await api("/api/v1/openclaw/gateway/restart", {
       method: "POST",
       body: JSON.stringify({})
     });
-    setStatus("Gateway restarted");
+    setStatus(`Gateway restart scheduled: ${data.unit || "started"}`);
   } catch (error) {
     setStatus(error.message, "error");
   } finally {

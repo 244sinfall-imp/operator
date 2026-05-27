@@ -20,6 +20,13 @@ const SEARCH_RESULT_LIMIT = Number(process.env.OPERATOR_SEARCH_RESULT_LIMIT ?? "
 const SEARCH_MAX_COLUMNS = Number(process.env.OPERATOR_SEARCH_MAX_COLUMNS ?? "240");
 const TRASH_ROOT = expandHome(process.env.OPERATOR_TRASH_DIR ?? "~/.openclaw/trash/bes-operator");
 const ALLOWED_ROOTS = parseAllowedRoots(process.env.OPERATOR_ALLOWED_ROOTS);
+const OPENCLAW_CLI = process.env.OPERATOR_OPENCLAW_CLI ?? "/home/imp/.nvm/versions/node/v24.15.0/bin/openclaw";
+const GATEWAY_SERVICE = process.env.OPERATOR_GATEWAY_SERVICE ?? "openclaw-gateway";
+const RESTART_NOTIFY_CHANNEL = process.env.OPERATOR_RESTART_NOTIFY_CHANNEL ?? "telegram";
+const RESTART_NOTIFY_ACCOUNT = process.env.OPERATOR_RESTART_NOTIFY_ACCOUNT ?? "self-maintainer";
+const RESTART_NOTIFY_TARGET = process.env.OPERATOR_RESTART_NOTIFY_TARGET ?? "355020023";
+const RESTART_NOTIFY_MESSAGE = process.env.OPERATOR_RESTART_NOTIFY_MESSAGE
+  ?? "Я ожил 🧙‍♂️ OpenClaw gateway перезапустился и снова на связи.";
 
 type FileHash = { sha256: string; exists: boolean };
 type ListItem = {
@@ -302,6 +309,39 @@ async function runCommand(command: string, args: string[]): Promise<CommandResul
   });
 }
 
+function shellSingleQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function buildRestartGatewayScript(): string {
+  const statusCommand = [shellSingleQuote(OPENCLAW_CLI), "status", "--deep"].join(" ");
+  const notifyCommand = [
+    shellSingleQuote(OPENCLAW_CLI),
+    "message",
+    "send",
+    "--channel",
+    shellSingleQuote(RESTART_NOTIFY_CHANNEL),
+    "--account",
+    shellSingleQuote(RESTART_NOTIFY_ACCOUNT),
+    "--target",
+    shellSingleQuote(RESTART_NOTIFY_TARGET),
+    "--message",
+    shellSingleQuote(RESTART_NOTIFY_MESSAGE)
+  ].join(" ");
+
+  return [
+    "set -eu",
+    `systemctl --user restart ${shellSingleQuote(GATEWAY_SERVICE)}`,
+    "ready=0",
+    "for _ in $(seq 1 30); do",
+    `  if ${statusCommand} >/dev/null 2>&1; then ready=1; break; fi`,
+    "  sleep 2",
+    "done",
+    "if [ \"$ready\" -ne 1 ]; then exit 1; fi",
+    notifyCommand
+  ].join("\n");
+}
+
 app.addHook("onRequest", async (request) => {
   const token = request.headers["x-operator-token"];
   if (token !== OPERATOR_TOKEN) {
@@ -399,7 +439,18 @@ app.post<{ Body: { query: string; root?: string } }>("/api/v1/search", async (re
 });
 
 app.post("/api/v1/openclaw/gateway/restart", async () => {
-  const result = await runCommand("systemctl", ["--user", "restart", "openclaw-gateway"]);
+  const unitName = `bes-operator-openclaw-restart-${Date.now()}`;
+  const result = await runCommand("systemd-run", [
+    "--user",
+    "--collect",
+    "--unit",
+    unitName,
+    "--description",
+    "Bes Operator OpenClaw gateway restart with notification",
+    "bash",
+    "-lc",
+    buildRestartGatewayScript()
+  ]);
   if (result.exitCode !== 0) {
     throw makeHttpError(500, result.stderr || `Command failed: ${result.command}`);
   }
@@ -407,7 +458,13 @@ app.post("/api/v1/openclaw/gateway/restart", async () => {
   return {
     ok: true,
     command: result.command,
-    restartedAt: new Date().toISOString()
+    unit: unitName,
+    scheduledAt: new Date().toISOString(),
+    notify: {
+      channel: RESTART_NOTIFY_CHANNEL,
+      account: RESTART_NOTIFY_ACCOUNT,
+      target: RESTART_NOTIFY_TARGET
+    }
   };
 });
 
