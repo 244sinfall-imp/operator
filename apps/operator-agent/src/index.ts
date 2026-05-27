@@ -37,6 +37,14 @@ type SearchResult = {
   preview: string;
 };
 
+type CommandResult = {
+  command: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+};
+
 function expandHome(value: string): string {
   if (value === "~") {
     return os.homedir();
@@ -263,6 +271,37 @@ async function searchFiles(query: string, root: string): Promise<SearchResult[]>
   });
 }
 
+async function runCommand(command: string, args: string[]): Promise<CommandResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout = (stdout + chunk).slice(-4096);
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr = (stderr + chunk).slice(-4096);
+    });
+    child.on("error", (error) => {
+      reject(makeHttpError(500, error.message));
+    });
+    child.on("close", (exitCode, signal) => {
+      resolve({
+        command: [command, ...args].join(" "),
+        exitCode,
+        signal,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+  });
+}
+
 app.addHook("onRequest", async (request) => {
   const token = request.headers["x-operator-token"];
   if (token !== OPERATOR_TOKEN) {
@@ -356,6 +395,19 @@ app.post<{ Body: { query: string; root?: string } }>("/api/v1/search", async (re
 
   return {
     results: await searchFiles(request.body.query, root)
+  };
+});
+
+app.post("/api/v1/openclaw/gateway/restart", async () => {
+  const result = await runCommand("systemctl", ["--user", "restart", "openclaw-gateway"]);
+  if (result.exitCode !== 0) {
+    throw makeHttpError(500, result.stderr || `Command failed: ${result.command}`);
+  }
+
+  return {
+    ok: true,
+    command: result.command,
+    restartedAt: new Date().toISOString()
   };
 });
 

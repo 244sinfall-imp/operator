@@ -23,6 +23,7 @@ const languageBadge = document.getElementById("language-badge");
 const diffOutput = document.getElementById("diff-output");
 const searchResults = document.getElementById("search-results");
 const logoutButton = document.getElementById("logout-button");
+const restartGatewayButton = document.getElementById("restart-gateway-button");
 const entriesCount = document.getElementById("entries-count");
 const searchCount = document.getElementById("search-count");
 
@@ -441,6 +442,26 @@ async function search() {
   }
 }
 
+async function restartGateway() {
+  if (!confirm("Restart OpenClaw gateway?")) {
+    return;
+  }
+
+  restartGatewayButton.disabled = true;
+  setStatus("Restarting gateway...", "busy");
+  try {
+    await api("/api/v1/openclaw/gateway/restart", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    setStatus("Gateway restarted");
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    restartGatewayButton.disabled = false;
+  }
+}
+
 document.getElementById("open-path").onclick = () => openDirectory(pathInput.value);
 document.getElementById("refresh").onclick = () => openDirectory(state.currentPath || state.root);
 document.getElementById("go-up").onclick = () => {
@@ -461,6 +482,7 @@ document.getElementById("search-input").onkeydown = (event) => {
     search();
   }
 };
+restartGatewayButton.onclick = restartGateway;
 logoutButton.onclick = logout;
 editorEl.oninput = updateEditorHighlight;
 editorEl.onscroll = () => {

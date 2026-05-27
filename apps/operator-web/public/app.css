@@ -397,6 +397,12 @@ button:hover {
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
 button:focus-visible {
   outline: 2px solid var(--sulfur);
   outline-offset: 2px;
@@ -426,6 +432,17 @@ button:focus-visible {
 .ghost-button {
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted-strong);
+}
+
+.danger-button {
+  border-color: rgba(255, 79, 63, 0.38);
+  background: rgba(255, 79, 63, 0.09);
+  color: #ffb3a9;
+}
+
+.danger-button:hover {
+  border-color: rgba(255, 79, 63, 0.58);
+  background: rgba(255, 79, 63, 0.16);
 }
 
 .toolbar-actions,
